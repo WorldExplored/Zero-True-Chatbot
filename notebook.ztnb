@@ -1,0 +1,87 @@
+notebookId = "c860a705-4629-490f-92f5-831a500daf96"
+notebookName = "Zero True"
+
+[cells.6b0d1aee-1c92-477b-a17b-cdd39cf0f3ea]
+cellName = ""
+cellType = "code"
+hideCell = "False"
+hideCode = "False"
+expandCode = "False"
+showTable = "False"
+nonReactive = "False"
+code = """
+from zero_true import TextInput, Slider, Button, Text, Layout, Row, Column, Card, state
+import openai
+
+# Configure OpenAI with your API key
+OPENAI_API_KEY = 'BLANK'
+openai.api_key = OPENAI_API_KEY
+
+# Initialize state
+zt_state = state()
+
+# Ensure state for message history
+if "message_history" not in zt_state:
+    zt_state["message_history"] = []
+
+# Initialize the temperature slider outside of the update function
+temperature_slider = Slider(id="temperature_slider", min=0, max=1, step=0.01, value=0.5, label="Temperature")
+
+# Function to generate text with OpenAI
+def generate_text(prompt, temperature):
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=temperature
+        )
+        return response.choices[0].message['content'].strip()
+    except Exception as e:
+        return f"An error occurred: {e}"
+
+def add_message_to_history(role, content):
+    zt_state["message_history"].append({"role": role, "content": content})
+
+def update_chat_ui():
+    prompt_input = TextInput(id="prompt_input", label="Enter your prompt", placeholder="Type something...")
+    generate_button = Button(id="generate_button", text="Generate")
+    
+    # Create a list of components for the chat history
+    chat_history_components = []
+    for message in zt_state["message_history"]:
+        component_id = f"chat_message_{len(chat_history_components)}"
+        chat_history_components.append(Text(id=component_id, text=message["content"], color="info" if message["role"] == "user" else "lightgrey").id)
+
+    # Create and update the chat card with history and inputs
+    chat_card = Card(
+        id="chat_card",
+        childComponents=chat_history_components + [prompt_input.id, generate_button.id],
+        color="lightblue",
+        elevation=2,
+        width=400,
+        location="center"
+    )
+
+    layout = Layout(rows=[
+        Row(components=[temperature_slider.id]),
+        Row(components=[chat_card.id])
+    ])
+
+    # Button click event handling
+    def on_generate_click():
+        user_prompt = prompt_input.value  # Get the value from the input
+        add_message_to_history("user", user_prompt)  # Add user prompt to history
+        generated_response = generate_text(user_prompt, temperature_slider.value)  # Generate response
+        add_message_to_history("assistant", generated_response)  # Add response to history
+        update_chat_ui()  # Update the UI with the new history
+    
+    if (generate_button.value):
+        on_generate_click()
+
+# Initial UI setup
+update_chat_ui()
+"""
+
