@@ -1,7 +1,20 @@
 notebookId = "c860a705-4629-490f-92f5-831a500daf96"
 notebookName = "Zero True"
 
-[cells.6b0d1aee-1c92-477b-a17b-cdd39cf0f3ea]
+[cells.ad5e08ad-7c2a-42a8-922b-addf666eab58]
+cellName = ""
+cellType = "text"
+hideCell = "False"
+hideCode = "False"
+expandCode = "False"
+showTable = "False"
+nonReactive = "False"
+code = """
+<p>This interactive notebook allows you to engage in a simulated chat with an AI model powered by OpenAI. Here's how you can use it:</p>
+<p>1. Entering Prompts: Use the text input box to type in your questions or statements you'd like the AI to respond to.<br>2. Adjusting Creativity: The temperature slider allows you to control the creativity of the AI's responses. A lower temperature results in more predictable replies, while a higher temperature yields more varied and creative outputs.<br>3. Generating Responses: After typing your prompt and setting the desired temperature, click the "Generate" button to receive a response from the AI.<br>4. Clearing the Chat: If you want to start over or clear the conversation, simply press the "Clear Chat" button to reset the chat history.<br>5. Viewing the Conversation:</p>
+<p>As the chat progresses, each input and response are encapsulated in colored cards, distinguishing your messages from the AI's, enhancing the chat interface's readability and user experience.</p>"""
+
+[cells.0c760aa3-5528-4819-b513-b5b7e43ac935]
 cellName = ""
 cellType = "code"
 hideCell = "False"
@@ -10,9 +23,11 @@ expandCode = "False"
 showTable = "False"
 nonReactive = "False"
 code = """
-from zero_true import TextInput, Slider, Button, Text, Layout, Row, Column, Card, state
+import zero_true as zt
+from zero_true import TextInput, Slider, Button, Text, Row, Column, Card, state, Layout
 import openai
 
+import openai
 # Configure OpenAI with your API key
 OPENAI_API_KEY = 'BLANK'
 openai.api_key = OPENAI_API_KEY
@@ -24,9 +39,18 @@ zt_state = state()
 if "message_history" not in zt_state:
     zt_state["message_history"] = []
 
-# Initialize the temperature slider outside of the update function
-temperature_slider = Slider(id="temperature_slider", min=0, max=1, step=0.01, value=0.5, label="Temperature")
 
+# UI Components
+temperature_slider = Slider(id="temperature_slider", min=0, max=1, step=0.01, value=0.5, label="Temperature")
+generate_button = Button(id="generate_button", text="Generate")
+prompt_input = TextInput(id="prompt_input", label="Enter your prompt", placeholder="Type something...")
+clear_chat = Button(id='clear_chat', text='Clear Chat')
+
+# Function to add a message to the history
+def add_message_to_history(role, content):
+    zt_state["message_history"].append({"role": role, "content": content})
+    prompt_input.value = ''  # Clear the prompt input after adding message to history
+    
 # Function to generate text with OpenAI
 def generate_text(prompt, temperature):
     try:
@@ -38,50 +62,70 @@ def generate_text(prompt, temperature):
             ],
             temperature=temperature
         )
-        return response.choices[0].message['content'].strip()
+        return response.choices[0].message['content']
     except Exception as e:
         return f"An error occurred: {e}"
 
-def add_message_to_history(role, content):
-    zt_state["message_history"].append({"role": role, "content": content})
-
+# Function to update the chat history and UI
 def update_chat_ui():
-    prompt_input = TextInput(id="prompt_input", label="Enter your prompt", placeholder="Type something...")
-    generate_button = Button(id="generate_button", text="Generate")
+    layout_rows = [
+        zt.Row([temperature_slider.id]),
+        zt.Row([prompt_input.id]),
+        zt.Row([generate_button.id]),
+        zt.Row([clear_chat.id])
+    ]
+
+    # Create cards for each message in history
+    for index, message in enumerate(zt_state["message_history"]):
+        header_text = "User Input:" if message["role"] == "user" else "GPT Output:"
+        header_color = "white" if message["role"] == "user" else "white"
+        card_color = "blue" if message["role"] == "user" else "green"
+        
+        message_header = Text(id=f"header_{index}", text=header_text, color=header_color)
+        message_text = Text(id=f"message_{index}", text=message["content"], color="info")
+        
+        # Create a new card for the message
+        message_card = Card(
+            id=f"message_card_{index}",
+            childComponents=[message_header.id, message_text.id],
+            color=card_color,
+            width=1200
+        )
+
+        # Append the card to the layout rows
+        card_row = zt.Row([message_card.id])
+        layout_rows.append(card_row)
+
+    # Update the layout with the new rows
+    layout = zt.Layout(rows=layout_rows)
     
-    # Create a list of components for the chat history
-    chat_history_components = []
-    for message in zt_state["message_history"]:
-        component_id = f"chat_message_{len(chat_history_components)}"
-        chat_history_components.append(Text(id=component_id, text=message["content"], color="info" if message["role"] == "user" else "lightgrey").id)
+    # Attempt to suppress errors while updating UI
+    try:
+        # Your code to render the layout goes here, if needed
+        pass
+    except Exception as e:
+        logging.error(f"An error occurred while updating the chat UI: {e}")
 
-    # Create and update the chat card with history and inputs
-    chat_card = Card(
-        id="chat_card",
-        childComponents=chat_history_components + [prompt_input.id, generate_button.id],
-        color="lightblue",
-        elevation=2,
-        width=400,
-        location="center"
-    )
 
-    layout = Layout(rows=[
-        Row(components=[temperature_slider.id]),
-        Row(components=[chat_card.id])
-    ])
+# Clear chat button event handler
+if clear_chat.value:
+    zt_state["message_history"] = []
+    update_chat_ui()
 
-    # Button click event handling
-    def on_generate_click():
-        user_prompt = prompt_input.value  # Get the value from the input
-        add_message_to_history("user", user_prompt)  # Add user prompt to history
-        generated_response = generate_text(user_prompt, temperature_slider.value)  # Generate response
-        add_message_to_history("assistant", generated_response)  # Add response to history
-        update_chat_ui()  # Update the UI with the new history
-    
-    if (generate_button.value):
-        on_generate_click()
+# Generate button event handler
+if generate_button.value:
+    user_prompt = prompt_input.value
+    generated_response = generate_text(user_prompt, temperature_slider.value)
+    add_message_to_history("user", user_prompt)
+    add_message_to_history("assistant", generated_response)
+    update_chat_ui()
 
-# Initial UI setup
-update_chat_ui()
+
+import logging
+
+try:
+    update_chat_ui()
+except Exception as e:
+    logging.error(f"An error occurred, but we're ignoring it: {e}")
 """
 
